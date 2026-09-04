@@ -1,0 +1,9 @@
+description: "hw-waveshare-28b: Waveshare ESP32-S3-Touch-LCD-2.8B board HAL for reticulous (shared I2C bus, PCA9554 expander, ST7701S panel sequence, battery; RGB display/touch/RTC/IMU/SD via spangap-lcd, spangap-rtc, imu and spangap-core Kconfig)."
+url: https://github.com/spangap/hw-waveshare-28b
+version: "0.1.0"
+license: "Apache-2.0"
+targets:
+  - esp32s3
+dependencies:
+  idf:
+    version: ">=5.5"

@@ -1,0 +1,8 @@
+# Build artifacts (spangap-generated)
+esp-idf/build/
+esp-idf/sdkconfig
+esp-idf/sdkconfig.old
+esp-idf/sdkconfig.defaults
+esp-idf/staging/
+esp-idf/managed_components/
+esp-idf/dependencies.lock
