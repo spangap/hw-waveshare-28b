@@ -52,10 +52,12 @@ for this exact board, **not** from a board in hand. Confirm against your unit:
 
 - **The panel's register table** (`kSt7701Init` in `esp-idf/src/waveshare28b.cpp`)
   is the panel vendor's, verbatim, plus the three commands any driver appends
-  after such a list: `MADCTL` (0x36), `COLMOD` (0x3A) and display-on (0x29). If
-  the colour channels come out swapped or the image is monochrome, `COLMOD` is
-  the one of those three to question — the panel is in RGB mode, where it
-  describes an interface it is not using.
+  after such a list: `MADCTL` (0x36), `COLMOD` (0x3A) and display-on (0x29).
+  `COLMOD` says **18 bit** on a sixteen-line bus, which is the whole trick of
+  this wiring: the SoC's sixteen lines land on the top of an eighteen-bit input
+  (`B1..B5`, `G0..G5`, `R1..R5`), so each channel is short its least significant
+  bits and nothing else. Told 16 bit, the panel looks for red where green is,
+  and the picture comes back in the wrong colours.
 - **Backlight on GPIO 6.** Waveshare's pin table names it there. If the screen
   is drawn but dark, the backlight is the thing to look for on the expander
   instead — some boards in this family put it on an expander line.
@@ -117,7 +119,7 @@ Nearly every pin is spoken for by the display: sixteen data lines and four sync
 signals. What is left is one I2C bus, one two-wire channel used twice, one ADC
 pin and the expander.
 
-### Display (ST7701S, 16-bit RGB, 480x640 portrait)
+### Display (ST7701S, 16-bit RGB, 480x640 glass, held landscape at 640x480)
 
 | Signal | GPIO |
 |---|---|
@@ -132,6 +134,21 @@ pin and the expander.
 Timing: 16 MHz pixel clock, hsync 10/70/60 (pulse/back/front, pixel clocks),
 vsync 10/20/20 (lines) — a 620×690 total frame at about 37 Hz, roughly 32 MB/s
 of PSRAM read.
+
+That read is why **bounce buffers are on** (`CONFIG_LCD_RGB_BOUNCE_LINES=10`),
+and on this board they are not optional — the picture walks down the glass
+without them, repeatably. Straight from PSRAM the panel's DMA queues behind
+every cache miss the CPU takes, *and* esp_lcd writes back the whole
+framebuffer's worth of cache lines on every flush; a starved RGB panel does not
+glitch and recover, its frame starts in the wrong place and stays there. Ten
+lines of internal RAM, twice over, removes both. The refill they cost is a CPU
+copy against a 0.7 ms deadline, which this board meets at 80 MHz — so nothing
+here pins the processor (`panel cpu 1` does, if a build ever needs it).
+
+The glass is held **landscape** and the picture is turned to suit
+(`s.lcd.rotation`, shipped at 270, all four turns offered on System → Display).
+An RGB panel has no rotation of its own, so spangap-lcd transposes each rendered
+strip into the framebuffer; the timings above are the glass and never turn.
 
 ### The one I2C bus (SDA 15 / SCL 7, port 0)
 

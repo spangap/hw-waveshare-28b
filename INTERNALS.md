@@ -130,15 +130,58 @@ attached — good enough to show, not good enough to schedule against.
   registers; spangap-lcd starts the timing generator in the init band. Between
   those two the glass is on and receiving no pixels, which is why the backlight
   starts at zero and lcd.cpp raises it after the first frame.
-- **An RGB panel has no rotation.** The SoC scans the framebuffer out in the
-  order the glass reads it, so `CONFIG_LCD_ROTATION_0` is not a preference —
-  90° and 270° would be a software rotate of every frame and are refused at
-  bring-up with a log line.
-- **A flash write can be seen on the glass.** With bounce buffers off
-  (`CONFIG_LCD_RGB_BOUNCE_LINES=0`) the LCD DMA reads the framebuffer straight
-  out of PSRAM, and a flash write parks the memory bus that read needs. The
-  symptom is a band of noise while the device writes its store; the lever is
-  that symbol, at the cost of internal RAM and some CPU.
+- **The landscape turn is paid for in software.** The SoC scans the framebuffer
+  out in the order the glass reads it, so an RGB panel has no rotation to ask
+  for: a quarter turn makes spangap-lcd transpose every rendered strip into the
+  framebuffer (`lcdPanelBlitRgb`), one extra pass over each repainted pixel and
+  one draw buffer of PSRAM. The panel timings stay native — they describe the
+  glass, not the picture. 0 and 180 are the free turns, and they are the right
+  choice for a build that wants the refresh back. `CONFIG_LCD_ROTATION_270` here
+  is only the shipped value of `s.lcd.rotation`; the operator owns it.
+- **The GT911's reset is the board's, and it is a sequence, not a pulse.** The
+  part reads its INT pin (GPIO 16) as it leaves reset to choose between its two
+  I2C addresses, and wants that pin driven across the edge and held for 50 ms
+  after it. `exioInit` drives it low — which selects 0x5D — and hands it back as
+  an input before spangap-lcd claims it as the touch interrupt. Left floating,
+  the part still answers the bus at whichever address it guessed, so the failure
+  shows up not as a missing controller but as one that never reports a finger.
+- **A starved RGB panel does not glitch, it slides.** The DMA refreshing this
+  glass must deliver two bytes per pixel clock — 32 MB/s during an active line —
+  out of the same PSRAM every repaint writes to, and data it misses is not a
+  dropped frame: the picture walks down the screen and stays where it walked.
+  `CONFIG_LCD_RGB_BOUNCE_LINES=10` is what prevents it, and it was measured
+  rather than assumed — the walk comes back, repeatably, with bouncing off.
+  Note what does NOT help, because both look like they should: a lower frame
+  rate (the demand inside a line is set by the pixel clock, and blanking only
+  adds recovery time between lines) and `CONFIG_LCD_RGB_RESTART_IN_VSYNC`, which
+  re-aligns the frame from an interrupt whose latency then lands in the picture
+  as a few pixels of offset that move.
+- **A flash write jerks the picture, once, and it heals itself.** Writing flash
+  means the cache goes down — NOR flash cannot serve a read from any address
+  while it is programming or erasing, and every instruction fetch is such a read
+  — and on this SoC the same cache fronts PSRAM. So for the 30-45 ms of a sector
+  erase the CPU cannot reach the framebuffer, the bounce refill does not happen,
+  and the glass shows a few lines of whatever was left in the buffer. Storage
+  commits do it; an OTA does it continuously for as long as it runs.
+
+  What makes it a blemish rather than a fault is the bouncing: the DMA still
+  gets its bytes on time, from a buffer nobody refilled, so the frame TIMING
+  never slips and the next frame is correct. Without bounce buffers the same
+  window costs the DMA real bytes, the frame comes up short, and the picture
+  slides permanently. Same cause, and the difference between a flicker and a
+  broken screen.
+
+  The cure, if a build ever needs the glass spotless through an update, is
+  `CONFIG_SPIRAM_XIP_FROM_PSRAM` (code and constants off flash, so the cache is
+  never disabled) plus `CONFIG_LCD_RGB_ISR_IRAM_SAFE` — which is also the only
+  arrangement in which IRAM-safety is legal here, since an IRAM ISR that reaches
+  for a framebuffer in PSRAM with the cache down panics outright. It costs 1-2 MB
+  of PSRAM and a slower boot, which is a poor trade against a millisecond of
+  smear on a device that writes flash rarely.
+- **The pixel clock has a floor of about 9 MHz.** Below it this panel stops
+  locking and stretches a slice of the frame across the glass — 6 MHz shows a
+  band of the middle, enlarged. The useful window measured on this unit is
+  9–20 MHz; 16 is the shipped value.
 - **The IMU's interrupts are on the expander, so there are none.**
   `CONFIG_IMU_INT_PIN=-1` is correct, not a stub: the straddle polls the part's
   latched status once a second, and the read is what clears the latch, so

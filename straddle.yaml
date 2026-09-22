@@ -113,15 +113,21 @@ kconfig:
   - CONFIG_SPANGAP_SDCARD_SPI_PIN_MOSI=1
   - CONFIG_SPANGAP_SDCARD_SPI_PIN_MISO=42
   # Display — 2.8" 480x640 IPS, ST7701S over a 16-bit RGB parallel bus. Held
-  # portrait, which is native: an RGB panel is scanned out in the glass's own
-  # order and has no rotation to apply. The controller's own registers are NOT
+  # LANDSCAPE, at 640x480: the glass is taller than it is wide and the shell —
+  # a title row, a keyboard under a text field — wants the other proportion. An
+  # RGB panel is scanned out in the glass's own order and has no rotation to
+  # ask for, so spangap-lcd transposes each rendered strip on its way into the
+  # framebuffer; the timings below stay native, because they are the glass.
+  # The rotation here is the SHIPPED value of s.lcd.rotation, which the operator
+  # changes on System → Display (all four turns, applied on the next boot).
+  # The controller's own registers are NOT
   # configured here — they are written by the board's onStart over the panel's
   # 3-wire SPI, because that channel's chip-select is on the IO expander and its
   # other two wires are the microSD's. Inert when --no-lcd.
   - CONFIG_LCD_BUS_RGB=y
   - CONFIG_LCD_NATIVE_WIDTH=480
   - CONFIG_LCD_NATIVE_HEIGHT=640
-  - CONFIG_LCD_ROTATION_0=y
+  - CONFIG_LCD_ROTATION_270=y
   - CONFIG_LCD_BL_PIN=6
   # Sync and data. The data lines are named for the BIT they carry, low to high
   # per colour; Waveshare's own table names the same pins B1..B5 / G0..G5 /
@@ -146,9 +152,16 @@ kconfig:
   - CONFIG_LCD_RGB_R2_PIN=8
   - CONFIG_LCD_RGB_R3_PIN=18
   - CONFIG_LCD_RGB_R4_PIN=17
-  # Timing. 16 MHz over a 620x690 total frame is ~37 Hz and ~32 MB/s of PSRAM
-  # read, which is what this panel and this memory are happy at together; the
-  # porches are the ones this glass is known to run steady on.
+  # Timing. 16 MHz on the RISING edge over a 620x690 total frame is ~37 Hz and
+  # ~32 MB/s of PSRAM read. These are the numbers this glass was seen to run a
+  # clean picture on, and they are not the numbers Waveshare's configuration for
+  # the sibling 2.8C carries (548x659, h 8/10/50, v 3/8/8) — that panel's
+  # porches were tried here and the picture would not hold still. A working
+  # timing set is evidence and a documented one is a hypothesis; when they
+  # disagree, this file keeps the evidence.
+  #
+  # `panel pclk` and `panel restart` on a running device are how any of this is
+  # questioned again, rather than a build at a time.
   - CONFIG_LCD_PCLK_MHZ=16
   - CONFIG_LCD_RGB_HSYNC_PULSE=10
   - CONFIG_LCD_RGB_HSYNC_BACK=70
@@ -157,16 +170,31 @@ kconfig:
   - CONFIG_LCD_RGB_VSYNC_BACK=20
   - CONFIG_LCD_RGB_VSYNC_FRONT=20
   # 80 lines of strip is 75 KB of PSRAM and a tenth of the screen per flush.
-  # Bounce buffers stay off until the glass says it wants them: the symptom that
-  # asks for them is a band of noise while the device writes its store.
+  #
+  # BOUNCE BUFFERS ARE ON, and on this board they are not a tuning preference —
+  # the picture walks down the glass without them, repeatably. Two things go
+  # wrong at once when the panel's DMA reads the framebuffer straight out of
+  # PSRAM: it queues behind every cache miss the CPU takes, and esp_lcd, with no
+  # bounce buffer to sync instead, writes back the WHOLE 600 KB framebuffer's
+  # worth of cache lines on every flush. A starved RGB panel does not glitch and
+  # recover — the frame starts in the wrong place and stays there.
+  #
+  # Bouncing removes both: the DMA reads internal RAM, which nothing contends
+  # for, and the refill reads the framebuffer through the cache, so coherency is
+  # free and esp_lcd skips the sync entirely. The refill is CPU work against a
+  # deadline — 9.4 KB every 0.7 ms — and it meets it at 80 MHz, so nothing here
+  # pins the clock (spangap-lcd's `panel cpu 1` does, for a board that needs it).
+  # Ten lines is 9.4 KB of internal RAM per buffer, two of them, and it divides
+  # the framebuffer evenly, which esp_lcd requires.
   - CONFIG_LCD_RGB_DRAW_LINES=80
-  - CONFIG_LCD_RGB_BOUNCE_LINES=0
+  - CONFIG_LCD_RGB_BOUNCE_LINES=10
   # UI zoom. This panel is 2.8" at 480x640 — about 285 ppi, twice the density of
   # the 2.8" 320x240 decks the shell's proportions were drawn against. 200%
-  # would make it physically identical to those; 150% trades a quarter of that
-  # size for a third more content on a screen you hold at reading distance. It
-  # is the operator's to change (System → Display → UI Zoom).
-  - CONFIG_LCD_UI_SCALE_DEFAULT=150
+  # would make it physically identical to those; 175% is what this glass reads
+  # comfortably at, held at arm's length, and it is one of the steps the UI Zoom
+  # row offers — a shipped value that is not on that list would show up there as
+  # no selection at all. It is the operator's to change (System → Display).
+  - CONFIG_LCD_UI_SCALE_DEFAULT=175
   # Touch — GT911 on the board's own I2C bus, brought up by the lcd component
   # (its CONFIG_LCD_TOUCH_* controller; the board contributes no touch code).
   # ADOPT, not create: three other chips are on those wires and the board's
@@ -183,6 +211,12 @@ kconfig:
       - CONFIG_LCD_TOUCH_I2C_KHZ=400
       - CONFIG_LCD_TOUCH_INT_PIN=16
       - CONFIG_LCD_TOUCH_RST_PIN=-1
+      # The controller is asked as well as watched. GPIO 16 is the only pin this
+      # board leaves free for the touch interrupt, and the part answers on the
+      # bus — but nothing here has yet seen an edge on that line, and a board
+      # whose glass is its whole input cannot wait on one. 50 ms is a fifth of
+      # the time a tap lasts, so nothing is missed by asking at that rate.
+      - CONFIG_LCD_TOUCH_POLL_MS=50
       # The glass is the only way to wake this board: BOOT is the sole button
       # and it is not reachable in use.
       - CONFIG_LCD_WAKE_ON_TOUCH_DEFAULT=y

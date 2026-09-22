@@ -126,16 +126,29 @@ static void exioInit(void)
               (uint8_t)((1u << EXIO_IMU_INT1) | (1u << EXIO_IMU_INT2) |
                         (1u << EXIO_RTC_INT)));
 
-    /* Reset both parts that have a reset line here. The GT911 samples its INT
-     * pin as it comes out of reset to choose between its two I2C addresses;
-     * nothing drives that pin at this point, and spangap-lcd's touch bring-up
-     * tries both addresses anyway, so the pulse is all that is needed. */
+    /* Reset both parts that have a reset line here.
+     *
+     * THE GT911 IS RESET TO ITS DATA SHEET, NOT JUST PULSED. It samples its INT
+     * pin as it leaves reset — that is how it chooses between its two I2C
+     * addresses, low for 0x5D — and it wants the pin DRIVEN across that moment
+     * and held for a further 50 ms. Left floating, the level it reads is
+     * whatever the line happened to be sitting at, and the part can come up
+     * answering the bus perfectly while never reporting a touch: the failure
+     * looks like broken glass and is really an unfinished reset. The pin is
+     * handed back as an input here, before spangap-lcd's touch bring-up takes
+     * it as its interrupt.
+     *
+     * The panel's reset rides along with it — the ST7701S wants ~50 ms of its
+     * own after release, which is the same wait. */
+    gpio_set_direction((gpio_num_t)BOARD_TP_INT_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level((gpio_num_t)BOARD_TP_INT_PIN, 0);
     exioSet(EXIO_LCD_RST, false);
     exioSet(EXIO_TP_RST,  false);
     vTaskDelay(pdMS_TO_TICKS(20));
     exioSet(EXIO_LCD_RST, true);
-    exioSet(EXIO_TP_RST,  true);
-    vTaskDelay(pdMS_TO_TICKS(50));      /* the ST7701S wants ~50 ms after reset */
+    exioSet(EXIO_TP_RST,  true);        /* the address is latched on this edge */
+    vTaskDelay(pdMS_TO_TICKS(55));
+    gpio_set_direction((gpio_num_t)BOARD_TP_INT_PIN, GPIO_MODE_INPUT);
 }
 
 /* =========================================================================
@@ -246,13 +259,18 @@ static const uint8_t kSt7701Init[] = {
     2, 0xE8, 0x00, 0x00,
     5, 0xFF, 0x77, 0x01, 0x00, 0x00, 0x00,
     1, 0x35, 0x00,                  /* tearing-effect line on */
-    /* The standard tail every driver appends after a vendor list: scan
-     * direction, pixel format, display on. If the colour channels come out
-     * swapped or the image is monochrome, the pixel format is the one of these
-     * three to question — the panel is in RGB mode, where 0x3A describes an
-     * interface it is not using. */
-    1, 0x36, 0x00,                  /* MADCTL: normal scan, RGB order */
-    1, 0x3A, 0x50,                  /* COLMOD: 16 bit/pixel */
+    /* NO MADCTL, NO COLMOD. Those two are what a driver appends to a vendor list
+     * by habit, and on this panel they are the habit that breaks it: the glass
+     * comes out of its own sequence already describing the bus it is wired to,
+     * and 0x3A is the register that then tells it to read that bus at a
+     * different width. Sent as 16-bit, the panel looks for red on lines that are
+     * carrying green — a purple screen. Sent as 18-bit, it reads only part of
+     * each channel and the brightest bits of all three go nowhere, which is the
+     * same picture with the colour drained out of it. Waveshare's own working
+     * configuration for this board sends neither, and neither do we.
+     *
+     * If the colour order ever does come out swapped, 0x36 with the BGR bit
+     * (0x08) is the one to add — not 0x3A. */
     0, 0x29,                        /* display on */
 };
 

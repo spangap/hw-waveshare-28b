@@ -33,6 +33,14 @@
 #define BOARD_I2C_SDA_PIN   15
 #define BOARD_I2C_SCL_PIN   7
 
+/* The GT911's interrupt, the one touch line that is a GPIO rather than an
+ * expander bit. It belongs to spangap-lcd in use (straddle.yaml hands it over as
+ * CONFIG_LCD_TOUCH_INT_PIN), but the board drives it for a moment first: the
+ * part reads this pin as it leaves reset to choose its I2C address, and that
+ * reset is the board's (see exioInit). Named here because a --no-lcd build
+ * still has the reset to do and no CONFIG_LCD_* symbols to do it with. */
+#define BOARD_TP_INT_PIN    16
+
 /* ── PCA9554 IO expander (0x20) ──────────────────────────────────────────────
  * Eight lines, all used, none brought out. Waveshare's documentation numbers
  * them EXIO1..EXIO8; the chip's own registers number the same lines P0..P7, and
