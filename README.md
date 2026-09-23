@@ -27,9 +27,12 @@ a microSD slot, a buzzer, a 3.7 V lithium connector with an onboard charger, and
 a **PCA9554** IO expander carrying the lines that were left over. Board
 reference: <https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.8B>.
 
-**No radio but the SoC's own.** There is no LoRa modem on this board, so
-`iface-lora` stays at its `CONFIG_LORA_COUNT=0` default and compiles to nothing;
-what this device joins a mesh with is WiFi, BLE and ESP-NOW.
+**No radio but the SoC's own.** There is no LoRa modem on this board, so it does
+not stage `iface-lora` and an image built on it has no LoRa settings section, no
+`s.lora.*` keys and no LoRaMon tile — nothing offers an operator a radio that is
+not there. What this device joins a mesh with is WiFi, BLE and ESP-NOW. Its
+network graph still draws the community's LoRa links in LoRa's own colour:
+`rnsd` publishes that, not the radio straddle.
 
 It is a **non-buildable** component — it decides nothing about what the device
 *does*. A buildable assembler (`reticulous/reticulous`) adds it and inherits the

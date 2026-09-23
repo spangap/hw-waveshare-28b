@@ -9,8 +9,9 @@
 # IPS panel: an ST7701S driven over a 16-bit RGB parallel bus, GT911 touch,
 # QMI8658 IMU, PCF85063 clock, microSD, a buzzer, a 3.7 V lithium connector with
 # its own charger, and a PCA9554 IO expander carrying the lines that were left
-# over. There is NO radio beyond the SoC's own WiFi and BLE — no LoRa, so
-# iface-lora stays at its CONFIG_LORA_COUNT=0 default and compiles to nothing.
+# over. There is NO radio beyond the SoC's own WiFi and BLE — no LoRa, so this
+# board does not stage iface-lora and an image built on it has no LoRa settings,
+# no s.lora.* keys and no LoRaMon: the mesh reaches it over WiFi and Bluetooth.
 #
 # What makes this board different from every other one here: nearly every pin is
 # spoken for by the display. Sixteen data lines plus four sync signals leave one
