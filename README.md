@@ -42,7 +42,7 @@ update story and the browser SPA all come from the buildable and its other
 straddles — not from here.
 
 The board stages `spangap-lcd` (it is a screen with a computer behind it; drop
-with `--no-lcd`), `spangap-rtc` and `imu`. There is **no hardware keyboard** and
+with `--no-lcd`), `rtc` and `imu`. There is **no hardware keyboard** and
 no button an operator can reach — BOOT is the only one and it is under the case
 — so the glass is the whole of this board's input: spangap-lcd's on-screen
 keyboard for text, and touch-to-wake as the only way back from standby.
@@ -89,7 +89,7 @@ Everything else on the board belongs to a generic straddle, configured from
 |---|---|---|
 | ST7701S RGB panel + backlight | [spangap-lcd](../spangap-lcd) `lcd_panel_rgb.cpp` | `CONFIG_LCD_BUS_RGB`, `CONFIG_LCD_RGB_*` |
 | GT911 touch | [spangap-lcd](../spangap-lcd) `lcd_touch.cpp` | `CONFIG_LCD_TOUCH_*` |
-| PCF85063 clock | [spangap-rtc](../spangap-rtc) | `CONFIG_RTC_CHIP_PCF85063`, `CONFIG_RTC_I2C_*` |
+| PCF85063 clock | [rtc](../rtc) | `CONFIG_RTC_CHIP_PCF85063`, `CONFIG_RTC_I2C_*` |
 | QMI8658 motion | [imu](../imu) | `CONFIG_IMU_BUS_I2C`, `CONFIG_IMU_I2C_*` |
 | microSD | [spangap-core](../spangap-core) `fs.cpp` | `CONFIG_SPANGAP_SDCARD_*` |
 
@@ -160,7 +160,7 @@ strip into the framebuffer; the timings above are the glass and never turn.
 | PCA9554 IO expander | 0x20 | this board |
 | GT911 touch (INT on GPIO 16, reset on expander P1) | 0x5D or 0x14 | spangap-lcd |
 | QMI8658 IMU | 0x6B | imu |
-| PCF85063 clock | 0x51 | spangap-rtc |
+| PCF85063 clock | 0x51 | rtc |
 
 The board creates this bus on a **named** controller (0) in `onStart`; the three
 straddles above adopt it by number rather than putting a second master on the
@@ -237,7 +237,7 @@ by the straddle that owns the part.
 
 ## Dependencies
 
-`spangap-core` (hard), and the three soft installs `spangap-lcd`, `spangap-rtc`
+`spangap-core` (hard), and the three soft installs `spangap-lcd`, `rtc`
 and `imu`, each droppable with `--without` (or `--no-lcd`), which takes its
 gated `kconfig:` block with it.
 

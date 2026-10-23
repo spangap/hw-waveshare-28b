@@ -46,7 +46,7 @@
  *
  * The bus is created on a NAMED controller (BOARD_I2C_PORT) rather than an
  * auto-allocated one, because three other straddles adopt it by number:
- * spangap-lcd's touch (CONFIG_LCD_TOUCH_I2C_ADOPT), spangap-rtc
+ * spangap-lcd's touch (CONFIG_LCD_TOUCH_I2C_ADOPT), rtc
  * (CONFIG_RTC_I2C_PORT) and spangap/imu (CONFIG_IMU_I2C_PORT). Everything on
  * this board that is not a display data line is on these two wires.
  *

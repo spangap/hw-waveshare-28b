@@ -11,7 +11,7 @@
  * NOT here, because they are other straddles' from pins this board supplies in
  * straddle.yaml: the RGB panel and its backlight (spangap-lcd's
  * CONFIG_LCD_BUS_RGB block), the GT911 touch (CONFIG_LCD_TOUCH_*), the
- * PCF85063 clock (spangap-rtc's CONFIG_RTC_*), the QMI8658 (spangap/imu's
+ * PCF85063 clock (rtc's CONFIG_RTC_*), the QMI8658 (spangap/imu's
  * CONFIG_IMU_*), and the microSD (spangap-core's CONFIG_SPANGAP_SDCARD_*).
  * What this board DOES own is everything those parts need to exist before they
  * are reached: the bus, the expander, and the panel's own register sequence.
